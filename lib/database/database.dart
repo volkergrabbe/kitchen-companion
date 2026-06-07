@@ -134,27 +134,24 @@ class AppSettings extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// For testing: In-memory database
+  AppDatabase.forTesting(QueryExecutor e) : super(e);
+
   @override
   int get schemaVersion => 1;
 
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) async {
+      await m.createAll();
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      // Future migrations here
+    },
+  );
+
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'kitchen_companion.db');
-  }
-
-  // ─────────────────────────────────────────────
-  // Migration (für zukünftige Schema-Änderungen)
-  // ─────────────────────────────────────────────
-  @override
-  MigrationStrategy get migration {
-    return MigrationStrategy(
-      onCreate: (Migrator m) async {
-        await m.createAllTables();
-      },
-      onUpgrade: (Migrator m, int from, int to) async {
-        // Indexes für häufige Queries in späteren Versionen
-        // if (from < 2) { await m.createIndex(...); }
-      },
-    );
   }
 
   // ─────────────────────────────────────────────
@@ -179,8 +176,8 @@ class AppDatabase extends _$AppDatabase {
       (select(recipes)..where((r) => r.id.equals(id))).getSingleOrNull();
 
   Future<int> insertRecipe(RecipesCompanion recipe) {
-    // Validierung: source muss gültig sein
-    if (!validSources.contains(recipe.source.value)) {
+    // Validierung: source muss gültig sein (nur wenn source explizit angegeben)
+    if (recipe.source.present && !validSources.contains(recipe.source.value)) {
       throw ArgumentError('Invalid source: ${recipe.source.value}');
     }
     final now = _now();
@@ -197,7 +194,8 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> deleteRecipe(int id) {
     return transaction(() async {
-      // RecipeIngredients werden via FK cascade gelöscht
+      // RecipeIngredients: explizit löschen (SQLite FKs nicht aktiviert)
+      await (delete(recipeIngredients)..where((ri) => ri.recipeId.equals(id))).go();
       // ShoppingListItems und FoodLogEntries: recipeId auf NULL setzen
       await (update(shoppingListItems)..where((s) => s.recipeId.equals(id)))
           .write(const ShoppingListItemsCompanion(recipeId: Value(null)));
@@ -313,8 +311,17 @@ class AppDatabase extends _$AppDatabase {
   Stream<AppSetting?> watchSettings() =>
       (select(appSettings)..where((s) => s.id.equals(1))).watchSingleOrNull();
 
-  Future<int> upsertSettings(AppSettingsCompanion settings) =>
-      into(appSettings).insertOnConflictUpdate(settings);
+  Future<int> upsertSettings(AppSettingsCompanion settings) async {
+    final existing = await getSettings();
+    if (existing == null) {
+      return into(appSettings).insert(settings.copyWith(
+        id: const Value(1),
+      ));
+    } else {
+      return (update(appSettings)..where((s) => s.id.equals(1)))
+          .write(settings);
+    }
+  }
 
   /// Settings initialisieren falls nicht vorhanden
   Future<void> ensureSettingsExist() async {
