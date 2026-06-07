@@ -23,8 +23,12 @@ class _KitchenCompanionAppState extends State<KitchenCompanionApp> {
   void initState() {
     super.initState();
     _db = AppDatabase();
-    _db.ensureSettingsExist(); // Settings initialisieren
-    _loadSettings();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await _db.ensureSettingsExist();
+    await _loadSettings();
   }
 
   @override
@@ -265,7 +269,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 const Icon(Icons.shopping_cart_outlined,
                     size: 64, color: Colors.grey),
                 const SizedBox(height: 16),
-                Text(l10n.noRecipes),
+                Text(l10n.emptyShoppingList),
               ],
             ));
           }
@@ -355,7 +359,7 @@ class _FoodJournalScreenState extends State<FoodJournalScreen> {
               children: [
                 const Icon(Icons.book_outlined, size: 64, color: Colors.grey),
                 const SizedBox(height: 16),
-                Text(l10n.noRecipes),
+                Text(l10n.emptyFoodJournal),
               ],
             ));
           }
@@ -462,8 +466,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 leading: const Icon(Icons.local_fire_department),
                 title: Text(l10n.calorieGoal),
                 subtitle: settings?.calorieGoal != null
-                    ? Text('${settings!.calorieGoal} kcal')
-                    : const Text('Nicht gesetzt'),
+                    ? Text('${settings!.calorieGoal} ${l10n.kcal}')
+                    : Text(l10n.notSet),
                 onTap: () {
                   // TODO: Calorie goal picker
                 },
@@ -472,8 +476,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 leading: const Icon(Icons.fitness_center),
                 title: Text(l10n.proteinGoal),
                 subtitle: settings?.proteinGoal != null
-                    ? Text('${settings!.proteinGoal}g')
-                    : const Text('Nicht gesetzt'),
+                    ? Text('${settings!.proteinGoal}${l10n.gram}')
+                    : Text(l10n.notSet),
                 onTap: () {
                   // TODO: Protein goal picker
                 },
@@ -482,8 +486,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 leading: const Icon(Icons.grain),
                 title: Text(l10n.carbsGoal),
                 subtitle: settings?.carbsGoal != null
-                    ? Text('${settings!.carbsGoal}g')
-                    : const Text('Nicht gesetzt'),
+                    ? Text('${settings!.carbsGoal}${l10n.gram}')
+                    : Text(l10n.notSet),
                 onTap: () {
                   // TODO: Carbs goal picker
                 },
@@ -492,8 +496,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 leading: const Icon(Icons.water_drop),
                 title: Text(l10n.fatGoal),
                 subtitle: settings?.fatGoal != null
-                    ? Text('${settings!.fatGoal}g')
-                    : const Text('Nicht gesetzt'),
+                    ? Text('${settings!.fatGoal}${l10n.gram}')
+                    : Text(l10n.notSet),
                 onTap: () {
                   // TODO: Fat goal picker
                 },

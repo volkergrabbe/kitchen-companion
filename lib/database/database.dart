@@ -190,15 +190,19 @@ class AppDatabase extends _$AppDatabase {
     ));
   }
 
-  Future<bool> updateRecipe(RecipesCompanion recipe) {
-    return update(recipes).replace(recipe.copyWith(
-      updatedAt: Value(_now()),
-    ));
+  Future<int> updateRecipe(int id, RecipesCompanion recipe) {
+    return (update(recipes)..where((r) => r.id.equals(id)))
+        .write(recipe.copyWith(updatedAt: Value(_now())));
   }
 
-  Future<int> deleteRecipe(int id) async {
+  Future<int> deleteRecipe(int id) {
     return transaction(() async {
-      await deleteRecipeIngredients(id);
+      // RecipeIngredients werden via FK cascade gelöscht
+      // ShoppingListItems und FoodLogEntries: recipeId auf NULL setzen
+      await (update(shoppingListItems)..where((s) => s.recipeId.equals(id)))
+          .write(const ShoppingListItemsCompanion(recipeId: Value(null)));
+      await (update(foodLogEntries)..where((f) => f.recipeId.equals(id)))
+          .write(const FoodLogEntriesCompanion(recipeId: Value(null)));
       return (delete(recipes)..where((r) => r.id.equals(id))).go();
     });
   }
@@ -290,8 +294,9 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<int> updateFoodLogEntry(int id, FoodLogEntriesCompanion entry) {
-    // Hinweis: entry muss alle Pflichtfelder enthalten (replace()-Semantik)
-    // Für partielle Updates: ID setzen und write() nutzen
+    if (entry.mealType.present && !validMealTypes.contains(entry.mealType.value)) {
+      throw ArgumentError('Invalid mealType: ${entry.mealType.value}');
+    }
     return (update(foodLogEntries)..where((f) => f.id.equals(id)))
         .write(entry);
   }
