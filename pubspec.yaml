@@ -1,0 +1,63 @@
+name: kitchen_companion
+description: "Kitchen Companion v2.0 — Wochenplan aus Discounter-Angeboten, Kontraindikationen, 100% lokal."
+publish_to: 'none'
+version: 2.0.0+20
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.19.0
+
+  # Local DB
+  drift: ^2.18.0
+  drift_flutter: ^0.2.0
+  sqlite3: ^2.4.6
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.3
+  path: ^1.9.0
+
+  # UI
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.5.1
+  fl_chart: ^0.68.0
+  table_calendar: ^3.1.2
+
+  # HTTP für Discounter-Scraper
+  http: ^1.2.2
+  html: ^0.15.4
+
+  # Background Jobs
+  workmanager: ^0.5.2
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+  shared_preferences: ^2.3.2
+
+  # Permissions / Sharing
+  permission_handler: ^11.3.1
+  share_plus: ^10.0.2
+
+  # Secure storage for secrets (Marktguru API key)
+  flutter_secure_storage: ^9.0.0
+
+  # Logging
+  logger: ^2.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.11
+  mockito: ^5.4.4
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/seed/
+    - assets/discounter_logos/
