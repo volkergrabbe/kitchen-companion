@@ -1,7 +1,9 @@
+import 'dart:ffi';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kitchen_companion/database/database.dart';
+import 'package:sqlite3/open.dart';
 
 /// In-memory DB für Tests
 AppDatabase _createTestDb() {
@@ -9,7 +11,13 @@ AppDatabase _createTestDb() {
 }
 
 void main() {
+  // SQLite-Bibliothek für Linux-Umgebung registrieren
+  open.overrideFor(OperatingSystem.linux, () {
+    return DynamicLibrary.open('libsqlite3.so.0');
+  });
+
   group('Recipes', () {
+
     late AppDatabase db;
 
     setUp(() async {
@@ -55,8 +63,8 @@ void main() {
       final id = await db.insertRecipe(RecipesCompanion.insert(name: 'Vorher'));
       await Future.delayed(const Duration(milliseconds: 10));
       final before = DateTime.now().millisecondsSinceEpoch;
-      await db.updateRecipe(id, RecipesCompanion(
-        name: const Value('Nachher'),
+      await db.updateRecipe(id, const RecipesCompanion(
+        name: Value('Nachher'),
       ));
       final recipe = await db.getRecipeById(id);
       expect(recipe!.updatedAt, greaterThanOrEqualTo(before));
@@ -119,10 +127,10 @@ void main() {
     });
 
     test('watchAllRecipes ist ein Stream', () async {
-      db.insertRecipe(RecipesCompanion.insert(name: 'Gestreamt'));
+      await db.insertRecipe(RecipesCompanion.insert(name: 'Gestreamt'));
       await expectLater(
         db.watchAllRecipes().first,
-        completion(anything),
+        completion(predicate((List<Recipe> l) => l.isNotEmpty)),
       );
     });
   });
@@ -236,10 +244,10 @@ void main() {
     });
 
     test('watchAllShoppingItems ist ein Stream', () async {
-      db.insertShoppingItem(ShoppingListItemsCompanion.insert(item: 'Gestreamt'));
+      await db.insertShoppingItem(ShoppingListItemsCompanion.insert(item: 'Gestreamt'));
       await expectLater(
         db.watchAllShoppingItems().first,
-        completion(anything),
+        completion(predicate((List<ShoppingListItem> l) => l.isNotEmpty)),
       );
     });
   });
@@ -294,27 +302,27 @@ void main() {
       ));
 
       // Valid mealType sollte funktionieren
-      await db.updateFoodLogEntry(id, FoodLogEntriesCompanion(
-        mealType: const Value('lunch'),
+      await db.updateFoodLogEntry(id, const FoodLogEntriesCompanion(
+        mealType: Value('lunch'),
       ));
 
       // Ungültiger mealType sollte werfen
       await expectLater(
-        () => db.updateFoodLogEntry(id, FoodLogEntriesCompanion(
-          mealType: const Value('invalid_meal'),
+        () => db.updateFoodLogEntry(id, const FoodLogEntriesCompanion(
+          mealType: Value('invalid_meal'),
         )),
         throwsA(isA<ArgumentError>()),
       );
     });
 
     test('watchFoodLogForDate ist ein Stream', () async {
-      db.insertFoodLogEntry(FoodLogEntriesCompanion.insert(
+      await db.insertFoodLogEntry(FoodLogEntriesCompanion.insert(
         date: '2024-01-01',
         mealType: 'breakfast',
       ));
       await expectLater(
         db.watchFoodLogForDate('2024-01-01').first,
-        completion(anything),
+        completion(predicate((List<FoodLogEntry> l) => l.isNotEmpty)),
       );
     });
 
@@ -355,8 +363,8 @@ void main() {
     });
 
     test('upsertSettings fügt ein wenn nicht vorhanden', () async {
-      await db.upsertSettings(AppSettingsCompanion(
-        calorieGoal: const Value(2000),
+      await db.upsertSettings(const AppSettingsCompanion(
+        calorieGoal: Value(2000),
       ));
       final settings = await db.getSettings();
       expect(settings!.calorieGoal, 2000);
@@ -364,8 +372,8 @@ void main() {
 
     test('upsertSettings updated existierende Settings', () async {
       await db.ensureSettingsExist();
-      await db.upsertSettings(AppSettingsCompanion(
-        calorieGoal: const Value(2500),
+      await db.upsertSettings(const AppSettingsCompanion(
+        calorieGoal: Value(2500),
       ));
       final settings = await db.getSettings();
       expect(settings!.calorieGoal, 2500);
@@ -374,10 +382,10 @@ void main() {
     });
 
     test('watchSettings ist ein Stream', () async {
-      db.ensureSettingsExist();
+      await db.ensureSettingsExist();
       await expectLater(
         db.watchSettings().first,
-        completion(anything),
+        completion(predicate((AppSetting? s) => s != null)),
       );
     });
   });

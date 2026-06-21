@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -27,23 +28,28 @@ class _KitchenCompanionAppState extends State<KitchenCompanionApp> {
   }
 
   Future<void> _initializeApp() async {
-    await _db.ensureSettingsExist();
-    await _loadSettings();
+    try {
+      await _db.ensureSettingsExist();
+      // P1-FIX: mounted-Check nach jedem await — verhindert setState auf disposed Widget
+      if (!mounted) return;
+      final settings = await _db.getSettings();
+      if (!mounted) return;
+      if (settings != null) {
+        setState(() {
+          _themeMode = _themeModeFromString(settings.theme);
+        });
+      }
+    } catch (e) {
+      // P0-FIX: Fehler nicht schlucken — bei DB-Init-Fehler auf System-Theme fallback
+      debugPrint('Failed to initialize app: $e');
+    }
   }
 
   @override
   void dispose() {
+    // P0-FIX: Korrekte Reihenfolge — DB schließen, dann super.dispose()
     _db.close();
     super.dispose();
-  }
-
-  Future<void> _loadSettings() async {
-    final settings = await _db.getSettings();
-    if (settings != null) {
-      setState(() {
-        _themeMode = _themeModeFromString(settings.theme);
-      });
-    }
   }
 
   ThemeMode _themeModeFromString(String theme) {
@@ -78,20 +84,28 @@ class _KitchenCompanionAppState extends State<KitchenCompanionApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      // P0-FIX: Nur Locales deklarieren, für die ARB-Dateien existieren
       supportedLocales: const [
         Locale('de'),
         Locale('en'),
-        Locale('fr'),
-        Locale('es'),
-        Locale('it'),
-        Locale('pl'),
-        Locale('nl'),
-        Locale('cs'),
-        Locale('pt'),
-        Locale('sv'),
       ],
       home: HomeScreen(db: _db),
     );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Hilfsfunktion: Sichere DB-Operation mit Fehler-Feedback
+// ─────────────────────────────────────────────
+Future<void> _runDbOp(BuildContext context, Future<void> Function() op) async {
+  try {
+    await op();
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler: $e')),
+      );
+    }
   }
 }
 
@@ -174,7 +188,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // TODO: Search
+              // TODO: Search — Feature für spätere Version
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n.search)),
+              );
             },
           ),
         ],
@@ -186,11 +203,21 @@ class _RecipesScreenState extends State<RecipesScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text(l10n.error));
           }
           final recipes = snapshot.data ?? [];
           if (recipes.isEmpty) {
-            return Center(child: Text(l10n.noRecipes));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.restaurant_menu_outlined,
+                      size: 64, color: Theme.of(context).colorScheme.outline),
+                  const SizedBox(height: 16),
+                  Text(l10n.noRecipes),
+                ],
+              ),
+            );
           }
           return ListView.builder(
             itemCount: recipes.length,
@@ -213,10 +240,67 @@ class _RecipesScreenState extends State<RecipesScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Add recipe
-        },
-        child: Text(l10n.addRecipe),
+        onPressed: () => _showAddRecipeDialog(context),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _showAddRecipeDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final nameController = TextEditingController();
+    final prepTimeController = TextEditingController();
+    final caloriesController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.addRecipe),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(labelText: l10n.name),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: prepTimeController,
+              decoration: InputDecoration(labelText: '${l10n.prepTime} (${l10n.minutes})'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: caloriesController,
+              decoration: InputDecoration(labelText: '${l10n.calories} (${l10n.kcal})'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              if (name.isEmpty) return;
+              final prepTime = int.tryParse(prepTimeController.text);
+              final calories = int.tryParse(caloriesController.text);
+              Navigator.pop(ctx);
+              _runDbOp(context, () async {
+                await widget.db.insertRecipe(RecipesCompanion.insert(
+                  name: name,
+                  prepTime: prepTime != null ? Value(prepTime) : const Value.absent(),
+                  calories: calories != null ? Value(calories) : const Value.absent(),
+                ));
+              });
+            },
+            child: Text(l10n.save),
+          ),
+        ],
       ),
     );
   }
@@ -245,9 +329,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep),
-            onPressed: () async {
-              await widget.db.clearCheckedItems();
-            },
+            // P1-FIX: Bestätigungsdialog vor dem Löschen
+            onPressed: () => _confirmClearChecked(context),
           ),
         ],
       ),
@@ -258,7 +341,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text(l10n.error));
           }
           final items = snapshot.data ?? [];
           if (items.isEmpty) {
@@ -266,8 +349,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.shopping_cart_outlined,
-                    size: 64, color: Colors.grey),
+                Icon(Icons.shopping_cart_outlined,
+                    size: 64, color: Theme.of(context).colorScheme.outline),
                 const SizedBox(height: 16),
                 Text(l10n.emptyShoppingList),
               ],
@@ -284,19 +367,112 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   style: TextStyle(
                     decoration:
                         item.checked ? TextDecoration.lineThrough : null,
-                    color: item.checked ? Colors.grey : null,
+                    color: item.checked
+                        ? Theme.of(context).colorScheme.outline
+                        : null,
                   ),
                 ),
                 subtitle: item.quantity != null
                     ? Text('${item.quantity} ${item.unit ?? ''}')
                     : null,
-                onChanged: (value) async {
-                  await widget.db.toggleShoppingItem(item.id, value ?? false);
+                onChanged: (value) {
+                  _runDbOp(context, () async {
+                    await widget.db.toggleShoppingItem(item.id, value ?? false);
+                  });
                 },
               );
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddShoppingItemDialog(context),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _confirmClearChecked(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.delete),
+        content: Text(l10n.clearCheckedConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _runDbOp(context, () async {
+                await widget.db.clearCheckedItems();
+              });
+            },
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddShoppingItemDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final itemController = TextEditingController();
+    final qtyController = TextEditingController();
+    final unitController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.addToShoppingList),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: itemController,
+              decoration: InputDecoration(labelText: l10n.name),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: qtyController,
+              decoration: InputDecoration(labelText: l10n.quantity),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: unitController,
+              decoration: InputDecoration(labelText: l10n.unit),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final item = itemController.text.trim();
+              if (item.isEmpty) return;
+              final qty = qtyController.text.trim();
+              final unit = unitController.text.trim();
+              Navigator.pop(ctx);
+              _runDbOp(context, () async {
+                await widget.db.insertShoppingItem(
+                  ShoppingListItemsCompanion.insert(
+                    item: item,
+                    quantity: qty.isNotEmpty ? Value(qty) : const Value.absent(),
+                    unit: unit.isNotEmpty ? Value(unit) : const Value.absent(),
+                  ),
+                );
+              });
+            },
+            child: Text(l10n.save),
+          ),
+        ],
       ),
     );
   }
@@ -333,7 +509,8 @@ class _FoodJournalScreenState extends State<FoodJournalScreen> {
                 context: context,
                 initialDate: _selectedDate,
                 firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
+                // P1-FIX: lastDate in Zukunft erlauben — Meal-Prep/Planung
+                lastDate: DateTime.now().add(const Duration(days: 365)),
               );
               if (date != null) {
                 setState(() => _selectedDate = date);
@@ -349,7 +526,7 @@ class _FoodJournalScreenState extends State<FoodJournalScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text(l10n.error));
           }
           final entries = snapshot.data ?? [];
           if (entries.isEmpty) {
@@ -357,7 +534,8 @@ class _FoodJournalScreenState extends State<FoodJournalScreen> {
                 child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.book_outlined, size: 64, color: Colors.grey),
+                Icon(Icons.book_outlined,
+                    size: 64, color: Theme.of(context).colorScheme.outline),
                 const SizedBox(height: 16),
                 Text(l10n.emptyFoodJournal),
               ],
@@ -369,8 +547,9 @@ class _FoodJournalScreenState extends State<FoodJournalScreen> {
               final entry = entries[index];
               return ListTile(
                 leading: _mealIcon(entry.mealType),
-                title: Text(entry.customName ?? '—'),
-                subtitle: Text(entry.mealType),
+                // P0-FIX: mealType lokalisiert statt Roh-String
+                title: Text(entry.customName ?? _mealTypeLabel(entry.mealType, l10n)),
+                subtitle: Text(_mealTypeLabel(entry.mealType, l10n)),
                 trailing: entry.calories != null
                     ? Text('${entry.calories} kcal')
                     : null,
@@ -380,9 +559,7 @@ class _FoodJournalScreenState extends State<FoodJournalScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          // TODO: Add food log entry
-        },
+        onPressed: () => _showAddFoodLogDialog(context, dateStr),
         child: const Icon(Icons.add),
       ),
     );
@@ -401,6 +578,90 @@ class _FoodJournalScreenState extends State<FoodJournalScreen> {
       default:
         return const Icon(Icons.restaurant);
     }
+  }
+
+  // P0-FIX: mealType übersetzen statt Roh-String anzeigen
+  String _mealTypeLabel(String mealType, AppLocalizations l10n) {
+    switch (mealType) {
+      case 'breakfast':
+        return l10n.mealTypeBreakfast;
+      case 'lunch':
+        return l10n.mealTypeLunch;
+      case 'dinner':
+        return l10n.mealTypeDinner;
+      case 'snack':
+        return l10n.mealTypeSnack;
+      default:
+        return mealType;
+    }
+  }
+
+  void _showAddFoodLogDialog(BuildContext context, String dateStr) {
+    final l10n = AppLocalizations.of(context)!;
+    final nameController = TextEditingController();
+    final caloriesController = TextEditingController();
+    String selectedMealType = 'breakfast';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(l10n.foodJournal),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedMealType,
+                decoration: InputDecoration(labelText: l10n.foodJournal),
+                items: [
+                  DropdownMenuItem(value: 'breakfast', child: Text(l10n.mealTypeBreakfast)),
+                  DropdownMenuItem(value: 'lunch', child: Text(l10n.mealTypeLunch)),
+                  DropdownMenuItem(value: 'dinner', child: Text(l10n.mealTypeDinner)),
+                  DropdownMenuItem(value: 'snack', child: Text(l10n.mealTypeSnack)),
+                ],
+                onChanged: (v) => setState(() => selectedMealType = v!),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(labelText: l10n.name),
+                autofocus: true,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: caloriesController,
+                decoration: InputDecoration(labelText: '${l10n.calories} (${l10n.kcal})'),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                final calories = int.tryParse(caloriesController.text);
+                Navigator.pop(ctx);
+                _runDbOp(context, () async {
+                  await widget.db.insertFoodLogEntry(
+                    FoodLogEntriesCompanion.insert(
+                      date: dateStr,
+                      mealType: selectedMealType,
+                      customName: name.isNotEmpty ? Value(name) : const Value.absent(),
+                      calories: calories != null ? Value(calories) : const Value.absent(),
+                    ),
+                  );
+                });
+              },
+              child: Text(l10n.save),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -432,7 +693,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text(l10n.error));
           }
           final settings = snapshot.data;
           return ListView(
@@ -440,26 +701,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.language),
                 title: Text(l10n.language),
-                subtitle: Text(settings?.locale ?? 'de'),
-                onTap: () {
-                  // TODO: Language picker
-                },
+                // P3-FIX: Lokalisierte Werte statt Roh-Strings
+                subtitle: Text(settings?.locale == 'en' ? 'English' : 'Deutsch'),
+                onTap: () => _showLanguagePicker(context, settings),
               ),
               ListTile(
                 leading: const Icon(Icons.straighten),
                 title: Text(l10n.units),
-                subtitle: Text(settings?.units ?? 'metric'),
-                onTap: () {
-                  // TODO: Units picker
-                },
+                subtitle: Text(settings?.units == 'imperial'
+                    ? l10n.unitsImperial
+                    : l10n.unitsMetric),
+                onTap: () => _showUnitsPicker(context, settings),
               ),
               ListTile(
                 leading: const Icon(Icons.palette),
                 title: Text(l10n.theme),
-                subtitle: Text(settings?.theme ?? 'system'),
-                onTap: () {
-                  // TODO: Theme picker
-                },
+                subtitle: Text(_themeLabel(settings?.theme ?? 'system', l10n)),
+                onTap: () => _showThemePicker(context, settings),
               ),
               const Divider(),
               ListTile(
@@ -468,9 +726,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: settings?.calorieGoal != null
                     ? Text('${settings!.calorieGoal} ${l10n.kcal}')
                     : Text(l10n.notSet),
-                onTap: () {
-                  // TODO: Calorie goal picker
-                },
+                onTap: () => _showNumberPicker(
+                  context, settings, 'calorieGoal', l10n.calorieGoal, l10n.kcal,
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.fitness_center),
@@ -478,9 +736,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: settings?.proteinGoal != null
                     ? Text('${settings!.proteinGoal}${l10n.gram}')
                     : Text(l10n.notSet),
-                onTap: () {
-                  // TODO: Protein goal picker
-                },
+                onTap: () => _showNumberPicker(
+                  context, settings, 'proteinGoal', l10n.proteinGoal, l10n.gram,
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.grain),
@@ -488,9 +746,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: settings?.carbsGoal != null
                     ? Text('${settings!.carbsGoal}${l10n.gram}')
                     : Text(l10n.notSet),
-                onTap: () {
-                  // TODO: Carbs goal picker
-                },
+                onTap: () => _showNumberPicker(
+                  context, settings, 'carbsGoal', l10n.carbsGoal, l10n.gram,
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.water_drop),
@@ -498,14 +756,161 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: settings?.fatGoal != null
                     ? Text('${settings!.fatGoal}${l10n.gram}')
                     : Text(l10n.notSet),
-                onTap: () {
-                  // TODO: Fat goal picker
-                },
+                onTap: () => _showNumberPicker(
+                  context, settings, 'fatGoal', l10n.fatGoal, l10n.gram,
+                ),
               ),
             ],
           );
         },
       ),
     );
+  }
+
+  String _themeLabel(String theme, AppLocalizations l10n) {
+    switch (theme) {
+      case 'light':
+        return l10n.themeLight;
+      case 'dark':
+        return l10n.themeDark;
+      default:
+        return l10n.themeSystem;
+    }
+  }
+
+  void _showLanguagePicker(BuildContext context, AppSetting? settings) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l10n.language),
+        children: [
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveSetting(context, const AppSettingsCompanion(locale: Value('de')));
+            },
+            child: const Text('Deutsch'),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveSetting(context, const AppSettingsCompanion(locale: Value('en')));
+            },
+            child: const Text('English'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUnitsPicker(BuildContext context, AppSetting? settings) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l10n.units),
+        children: [
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveSetting(context, const AppSettingsCompanion(units: Value('metric')));
+            },
+            child: Text(l10n.unitsMetric),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveSetting(context, const AppSettingsCompanion(units: Value('imperial')));
+            },
+            child: Text(l10n.unitsImperial),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showThemePicker(BuildContext context, AppSetting? settings) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l10n.theme),
+        children: [
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveSetting(context, const AppSettingsCompanion(theme: Value('system')));
+            },
+            child: Text(l10n.themeSystem),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveSetting(context, const AppSettingsCompanion(theme: Value('light')));
+            },
+            child: Text(l10n.themeLight),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveSetting(context, const AppSettingsCompanion(theme: Value('dark')));
+            },
+            child: Text(l10n.themeDark),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNumberPicker(BuildContext context, AppSetting? settings,
+      String field, String title, String unit) {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(labelText: '$title ($unit)'),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              Navigator.pop(ctx);
+              if (text.isEmpty) return;
+              final value = double.tryParse(text);
+              if (value == null) return;
+              final companion = switch (field) {
+                'calorieGoal' => AppSettingsCompanion(calorieGoal: Value(value.round())),
+                'proteinGoal' => AppSettingsCompanion(proteinGoal: Value(value)),
+                'carbsGoal' => AppSettingsCompanion(carbsGoal: Value(value)),
+                'fatGoal' => AppSettingsCompanion(fatGoal: Value(value)),
+                _ => null,
+              };
+              if (companion != null) {
+                _saveSetting(context, companion);
+              }
+            },
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _saveSetting(BuildContext context, AppSettingsCompanion companion) {
+    _runDbOp(context, () async {
+      await widget.db.upsertSettings(companion);
+    });
   }
 }

@@ -58,6 +58,8 @@
   "emptyShoppingList": "Shopping list is empty",
   "emptyFoodJournal": "No entries yet",
   "notSet": "Not set",
+  "error": "An error occurred",
+  "clearCheckedConfirm": "Remove checked items?",
   "kcal": "kcal",
   "gram": "g",
   "monday": "Monday",

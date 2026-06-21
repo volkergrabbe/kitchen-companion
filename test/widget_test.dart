@@ -1,30 +1,44 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'dart:ffi';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:drift/native.dart';
+import 'package:kitchen_companion/database/database.dart';
 import 'package:kitchen_companion/main.dart';
+import 'package:sqlite3/open.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  // SQLite-Bibliothek für Linux-Umgebung registrieren
+  open.overrideFor(OperatingSystem.linux, () {
+    return DynamicLibrary.open('libsqlite3.so.0');
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('HomeScreen Rauchtest', (WidgetTester tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('de'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('de'), Locale('en')],
+        home: HomeScreen(db: db),
+      ),
+    );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Warten, bis alles gerendert ist
+    await tester.pumpAndSettle();
+
+    // Verifizieren, dass wir die Rezepte-Ansicht sehen (z.B. den Text "Rezepte" oder "Keine Rezepte vorhanden")
+    expect(find.text('Rezepte'), findsWidgets);
+    expect(find.text('Keine Rezepte vorhanden'), findsOneWidget);
+
+    await db.close();
   });
 }
+

@@ -62,6 +62,8 @@
   "emptyShoppingList": "Einkaufsliste ist leer",
   "emptyFoodJournal": "Noch keine Einträge",
   "notSet": "Nicht gesetzt",
+  "error": "Ein Fehler ist aufgetreten",
+  "clearCheckedConfirm": "Abgehakte Einträge entfernen?",
   "kcal": "kcal",
   "gram": "g",
   "monday": "Montag",

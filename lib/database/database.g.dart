@@ -3230,6 +3230,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ShoppingListItemsTable(this);
   late final $FoodLogEntriesTable foodLogEntries = $FoodLogEntriesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final Index idxIngredientsName = Index('idx_ingredients_name',
+      'CREATE INDEX idx_ingredients_name ON ingredients (name)');
+  late final Index idxTranslationsIngredient = Index(
+      'idx_translations_ingredient',
+      'CREATE INDEX idx_translations_ingredient ON ingredient_translations (ingredient_id)');
+  late final Index idxRecipeIngredientsRecipe = Index(
+      'idx_recipe_ingredients_recipe',
+      'CREATE INDEX idx_recipe_ingredients_recipe ON recipe_ingredients (recipe_id)');
+  late final Index idxRecipeIngredientsIngredient = Index(
+      'idx_recipe_ingredients_ingredient',
+      'CREATE INDEX idx_recipe_ingredients_ingredient ON recipe_ingredients (ingredient_id)');
+  late final Index idxShoppingChecked = Index('idx_shopping_checked',
+      'CREATE INDEX idx_shopping_checked ON shopping_list_items (checked)');
+  late final Index idxFoodlogDate = Index('idx_foodlog_date',
+      'CREATE INDEX idx_foodlog_date ON food_log_entries (date)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3241,7 +3256,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         recipeIngredients,
         shoppingListItems,
         foodLogEntries,
-        appSettings
+        appSettings,
+        idxIngredientsName,
+        idxTranslationsIngredient,
+        idxRecipeIngredientsRecipe,
+        idxRecipeIngredientsIngredient,
+        idxShoppingChecked,
+        idxFoodlogDate
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(

@@ -6,6 +6,7 @@ part 'database.g.dart';
 // ─────────────────────────────────────────────
 // Zutaten (normalisierte Tabelle)
 // ─────────────────────────────────────────────
+@TableIndex(name: 'idx_ingredients_name', columns: {#name})
 class Ingredients extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()(); // Sprachunabhängig (interner Key)
@@ -19,6 +20,7 @@ class Ingredients extends Table {
 // ─────────────────────────────────────────────
 // Ingredient-Übersetzungen (i18n)
 // ─────────────────────────────────────────────
+@TableIndex(name: 'idx_translations_ingredient', columns: {#ingredientId})
 class IngredientTranslations extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get ingredientId => integer().references(Ingredients, #id)();
@@ -34,6 +36,8 @@ class IngredientTranslations extends Table {
 // ─────────────────────────────────────────────
 // Rezept-Zutaten-Verknüpfung (Portionen-Skalierung)
 // ─────────────────────────────────────────────
+@TableIndex(name: 'idx_recipe_ingredients_recipe', columns: {#recipeId})
+@TableIndex(name: 'idx_recipe_ingredients_ingredient', columns: {#ingredientId})
 class RecipeIngredients extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get recipeId =>
@@ -71,6 +75,7 @@ class Recipes extends Table {
 // ─────────────────────────────────────────────
 // Einkaufsliste
 // ─────────────────────────────────────────────
+@TableIndex(name: 'idx_shopping_checked', columns: {#checked})
 class ShoppingListItems extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get locale => text().withDefault(const Constant('de'))();
@@ -86,6 +91,7 @@ class ShoppingListItems extends Table {
 // ─────────────────────────────────────────────
 // Ernährungstagebuch
 // ─────────────────────────────────────────────
+@TableIndex(name: 'idx_foodlog_date', columns: {#date})
 class FoodLogEntries extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get date => text()(); // Nur Datum (YYYY-MM-DD)
@@ -135,7 +141,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   /// For testing: In-memory database
-  AppDatabase.forTesting(QueryExecutor e) : super(e);
+  AppDatabase.forTesting(super.e);
 
   @override
   int get schemaVersion => 1;
@@ -146,7 +152,12 @@ class AppDatabase extends _$AppDatabase {
       await m.createAll();
     },
     onUpgrade: (Migrator m, int from, int to) async {
-      // Future migrations here
+      // Future migrations here — use stepByStep when schemaVersion > 1
+    },
+    beforeOpen: (OpeningDetails details) async {
+      // P0-FIX: Foreign Keys aktivieren — ohne dieses PRAGMA ignoriert SQLite
+      // alle REFERENCES/ON DELETE CASCADE/SET NULL Deklarationen.
+      await customStatement('PRAGMA foreign_keys = ON');
     },
   );
 
@@ -159,11 +170,12 @@ class AppDatabase extends _$AppDatabase {
   // ─────────────────────────────────────────────
   static const validMealTypes = {'breakfast', 'lunch', 'dinner', 'snack'};
   static const validSources = {'manual', 'openrecipe', 'usda', 'monsieur_cuisine'};
+  static final _dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
   // ─────────────────────────────────────────────
   // Hilfsfunktionen
   // ─────────────────────────────────────────────
-  int _now() => DateTime.now().millisecondsSinceEpoch;
+  static int _now() => DateTime.now().millisecondsSinceEpoch;
 
   // ─────────────────────────────────────────────
   // Rezepte
@@ -188,15 +200,19 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<int> updateRecipe(int id, RecipesCompanion recipe) {
+    // P1-FIX: source-Validierung auch bei Update (wie bei insertRecipe)
+    if (recipe.source.present && !validSources.contains(recipe.source.value)) {
+      throw ArgumentError('Invalid source: ${recipe.source.value}');
+    }
     return (update(recipes)..where((r) => r.id.equals(id)))
         .write(recipe.copyWith(updatedAt: Value(_now())));
   }
 
   Future<int> deleteRecipe(int id) {
     return transaction(() async {
-      // RecipeIngredients: explizit löschen (SQLite FKs nicht aktiviert)
+      // FKs sind jetzt aktiv (PRAGMA foreign_keys = ON), aber wir behalten
+      // die manuelle Cascade als Defense-in-Depth für SQLite-Edge-Cases.
       await (delete(recipeIngredients)..where((ri) => ri.recipeId.equals(id))).go();
-      // ShoppingListItems und FoodLogEntries: recipeId auf NULL setzen
       await (update(shoppingListItems)..where((s) => s.recipeId.equals(id)))
           .write(const ShoppingListItemsCompanion(recipeId: Value(null)));
       await (update(foodLogEntries)..where((f) => f.recipeId.equals(id)))
@@ -284,6 +300,11 @@ class AppDatabase extends _$AppDatabase {
     if (!validMealTypes.contains(entry.mealType.value)) {
       throw ArgumentError('Invalid mealType: ${entry.mealType.value}');
     }
+    // P2-FIX: date-Format validieren (YYYY-MM-DD)
+    if (!_dateRegex.hasMatch(entry.date.value)) {
+      throw ArgumentError(
+          'Invalid date format (YYYY-MM-DD expected): ${entry.date.value}');
+    }
     final now = _now();
     return into(foodLogEntries).insert(entry.copyWith(
       timestamp: Value(now),
@@ -294,6 +315,11 @@ class AppDatabase extends _$AppDatabase {
   Future<int> updateFoodLogEntry(int id, FoodLogEntriesCompanion entry) {
     if (entry.mealType.present && !validMealTypes.contains(entry.mealType.value)) {
       throw ArgumentError('Invalid mealType: ${entry.mealType.value}');
+    }
+    // P2-FIX: date-Format auch bei Update validieren
+    if (entry.date.present && !_dateRegex.hasMatch(entry.date.value)) {
+      throw ArgumentError(
+          'Invalid date format (YYYY-MM-DD expected): ${entry.date.value}');
     }
     return (update(foodLogEntries)..where((f) => f.id.equals(id)))
         .write(entry);
@@ -311,16 +337,11 @@ class AppDatabase extends _$AppDatabase {
   Stream<AppSetting?> watchSettings() =>
       (select(appSettings)..where((s) => s.id.equals(1))).watchSingleOrNull();
 
-  Future<int> upsertSettings(AppSettingsCompanion settings) async {
-    final existing = await getSettings();
-    if (existing == null) {
-      return into(appSettings).insert(settings.copyWith(
-        id: const Value(1),
-      ));
-    } else {
-      return (update(appSettings)..where((s) => s.id.equals(1)))
-          .write(settings);
-    }
+  // P0-FIX: insertOnConflictUpdate statt Read-then-Write — atomar, keine Race Condition
+  Future<int> upsertSettings(AppSettingsCompanion settings) {
+    return into(appSettings).insertOnConflictUpdate(
+      settings.copyWith(id: const Value(1)),
+    );
   }
 
   /// Settings initialisieren falls nicht vorhanden

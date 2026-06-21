@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.localfirst.kitchen_companion"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -1,3 +1,6 @@
+# Temp JDK (build artifact)
+.temp_jdk/
+
 # Miscellaneous
 *.class
 *.log
