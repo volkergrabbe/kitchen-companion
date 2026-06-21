@@ -1,0 +1,97 @@
+{
+  "@@locale": "en",
+  "appTitle": "Kitchen Companion",
+  "recipes": "Recipes",
+  "shoppingList": "Shopping list",
+  "foodJournal": "Food journal",
+  "settings": "Settings",
+  "noRecipes": "No recipes yet",
+  "addRecipe": "Add recipe",
+  "emptyShoppingList": "Shopping list is empty",
+  "emptyFoodJournal": "No entries today",
+  "minutes": "min",
+  "kcal": "kcal",
+  "gram": "g",
+  "notSet": "Not set",
+  "language": "Language",
+  "units": "Units",
+  "theme": "Theme",
+  "calorieGoal": "Calorie goal",
+  "proteinGoal": "Protein goal",
+  "carbsGoal": "Carbs goal",
+  "fatGoal": "Fat goal",
+  "weeklyPlan": "Weekly plan",
+  "@weeklyPlan": {
+    "description": "Weekly plan tab"
+  },
+  "generatePlan": "Generate plan",
+  "noActivePlan": "No active plan",
+  "personsCount": "{count, plural, =1{1 person} other{{count} persons}}",
+  "@personsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "contraindications": "Contraindications",
+  "activeContraindications": "Active contraindications",
+  "availableContraindications": "Available contraindications",
+  "addContraindication": "Add",
+  "removeContraindication": "Remove",
+  "disease": "Disease",
+  "medication": "Medication",
+  "severityAvoid": "Avoid",
+  "severityLimit": "Limit",
+  "severityCaution": "Caution",
+  "discounters": "Discounters",
+  "offers": "Offers",
+  "noOffers": "No offers available. Refresh discounters.",
+  "refreshOffers": "Refresh offers",
+  "refreshing": "Refreshing…",
+  "refreshResult": "Refresh: {success} OK, {failed} failed",
+  "@refreshResult": {
+    "placeholders": {
+      "success": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
+  "settingsZipCode": "Postal code",
+  "settingsPersons": "Persons in household",
+  "settingsMarktguru": "Marktguru API (v1.1)",
+  "settingsMarktguruHint": "Optional: Marktguru API key for better offers. Stored locally, no cloud.",
+  "settingsMarktguruApiKey": "API key",
+  "weeklyPlanAuto": "Auto-generate weekly plan",
+  "shoppingFromPlan": "Shopping list from plan",
+  "warningFor": "Warning: {name}",
+  "@warningFor": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "notificationsEnable": "Enable notifications",
+  "notificationsEnableHint": "Allows the app to notify you about refresh and plan events (Android 13+).",
+  "notificationsStatus": "Status: {status}",
+  "@notificationsStatus": {
+    "placeholders": {
+      "status": {"type": "String"}
+    }
+  },
+  "notifStatusGranted": "granted",
+  "notifStatusDenied": "denied",
+  "notifStatusPermanentlyDenied": "permanently denied (enable in system settings)",
+  "notifStatusRestricted": "restricted",
+  "notifStatusLimited": "limited",
+  "notifStatusProvisional": "provisional",
+  "openSettings": "Open system settings",
+  "monday": "Monday",
+  "tuesday": "Tuesday",
+  "wednesday": "Wednesday",
+  "thursday": "Thursday",
+  "friday": "Friday",
+  "saturday": "Saturday",
+  "sunday": "Sunday",
+  "breakfast": "Breakfast",
+  "lunch": "Lunch",
+  "dinner": "Dinner",
+  "snack": "Snack",
+  "kcalTotal": "total kcal"
+}

@@ -1,0 +1,100 @@
+{
+  "@@locale": "de",
+  "appTitle": "Kitchen Companion",
+  "@appTitle": {
+    "description": "App-Titel"
+  },
+  "recipes": "Rezepte",
+  "shoppingList": "Einkaufszettel",
+  "foodJournal": "Ernährungstagebuch",
+  "settings": "Einstellungen",
+  "noRecipes": "Noch keine Rezepte vorhanden",
+  "addRecipe": "Rezept hinzufügen",
+  "emptyShoppingList": "Einkaufszettel ist leer",
+  "emptyFoodJournal": "Noch keine Einträge heute",
+  "minutes": "Min",
+  "kcal": "kcal",
+  "gram": "g",
+  "notSet": "Nicht gesetzt",
+  "language": "Sprache",
+  "units": "Einheiten",
+  "theme": "Design",
+  "calorieGoal": "Kalorienziel",
+  "proteinGoal": "Protein-Ziel",
+  "carbsGoal": "Kohlenhydrat-Ziel",
+  "fatGoal": "Fett-Ziel",
+  "weeklyPlan": "Wochenplan",
+  "@weeklyPlan": {
+    "description": "Wochenplan-Tab"
+  },
+  "generatePlan": "Wochenplan erstellen",
+  "noActivePlan": "Noch kein Wochenplan vorhanden",
+  "personsCount": "{count, plural, =1{1 Person} other{{count} Personen}}",
+  "@personsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "contraindications": "Kontraindikationen",
+  "activeContraindications": "Aktive Kontraindikationen",
+  "availableContraindications": "Verfügbare Kontraindikationen",
+  "addContraindication": "Hinzufügen",
+  "removeContraindication": "Entfernen",
+  "disease": "Krankheit",
+  "medication": "Medikament",
+  "severityAvoid": "Meiden",
+  "severityLimit": "Einschränken",
+  "severityCaution": "Vorsicht",
+  "discounters": "Discounter",
+  "offers": "Angebote",
+  "noOffers": "Keine Angebote verfügbar. Aktualisiere die Discounter.",
+  "refreshOffers": "Angebote aktualisieren",
+  "refreshing": "Aktualisiere…",
+  "refreshResult": "Aktualisierung: {success} OK, {failed} fehlgeschlagen",
+  "@refreshResult": {
+    "placeholders": {
+      "success": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
+  "settingsZipCode": "Postleitzahl",
+  "settingsPersons": "Personen im Haushalt",
+  "settingsMarktguru": "Marktguru API (v1.1)",
+  "settingsMarktguruHint": "Optional: Marktguru-API-Key für bessere Angebote. Lokal gespeichert, keine Cloud.",
+  "settingsMarktguruApiKey": "API-Key",
+  "weeklyPlanAuto": "Wochenplan automatisch erstellen",
+  "shoppingFromPlan": "Einkaufszettel aus Plan",
+  "warningFor": "Warnung: {name}",
+  "@warningFor": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "notificationsEnable": "Benachrichtigungen aktivieren",
+  "notificationsEnableHint": "Erlaubt der App, dich über Aktualisierungen und Plan-Erstellung zu informieren (Android 13+).",
+  "notificationsStatus": "Status: {status}",
+  "@notificationsStatus": {
+    "placeholders": {
+      "status": {"type": "String"}
+    }
+  },
+  "notifStatusGranted": "erteilt",
+  "notifStatusDenied": "verweigert",
+  "notifStatusPermanentlyDenied": "dauerhaft verweigert (in den System-Einstellungen aktivieren)",
+  "notifStatusRestricted": "eingeschränkt",
+  "notifStatusLimited": "eingeschränkt",
+  "notifStatusProvisional": "vorläufig",
+  "openSettings": "System-Einstellungen öffnen",
+  "monday": "Montag",
+  "tuesday": "Dienstag",
+  "wednesday": "Mittwoch",
+  "thursday": "Donnerstag",
+  "friday": "Freitag",
+  "saturday": "Samstag",
+  "sunday": "Sonntag",
+  "breakfast": "Frühstück",
+  "lunch": "Mittagessen",
+  "dinner": "Abendessen",
+  "snack": "Snack",
+  "kcalTotal": "kcal gesamt"
+}
